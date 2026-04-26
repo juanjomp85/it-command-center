@@ -1,102 +1,181 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+"use client";
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
+import { useState, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form"; 
+import { 
+  Container, Typography, TextField, Button, Paper, 
+  MenuItem, Box, Divider, List, ListItem, ListItemText, Chip, CircularProgress
+} from "@mui/material";
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+enum TaskPriority { LOW = 'LOW', MEDIUM = 'MEDIUM', HIGH = 'HIGH', CRITICAL = 'CRITICAL' }
+interface TaskFormData { title: string; description: string; priority: TaskPriority; }
+interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+}
 
+export default function CommandCenterDashboard() {
+  // 1. EL ESCUDO CONTRA ERRORES DE HIDRATACIÓN (SSR)
+  const [isMounted, setIsMounted] = useState(false);
+  
+  const { control, handleSubmit, reset } = useForm<TaskFormData>({
+    defaultValues: {
+      title: "",
+      description: "",
+      priority: TaskPriority.MEDIUM
+    }
+  });
+  
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  const fetchTasks = async () => {
+    try {
+      const response = await fetch("http://localhost:4000/tasks");
+      
+      // 1. Verificamos si el servidor devolvió un error (ej. 404 o 500)
+      if (!response.ok) {
+        const errorText = await response.text(); // Leemos el HTML del error
+        console.error("El backend devolvió un error:", response.status, errorText);
+        return; // Salimos antes de que intente parsear el JSON
+      }
+
+      // 2. Si todo está bien, parseamos el JSON de forma segura
+      const data = await response.json();
+      setTasks(data);
+    } catch (error) {
+      console.error("Error de conexión (¿Está el backend encendido?):", error);
+    }
+  };
+
+  useEffect(() => {
+    setIsMounted(true);
+    fetchTasks();
+  }, []);
+
+  const onSubmit = async (data: TaskFormData) => {
+    try {
+      const response = await fetch("http://localhost:4000/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Fallo al crear la tarea:", response.status, errorText);
+        return;
+      }
+
+      reset();
+      fetchTasks();
+      
+    } catch (error) {
+      console.error("Error de red al crear tarea:", error);
+    }
+  };
+
+  // 3. Si el servidor está intentando renderizar, devolvemos un estado de carga
+  if (!isMounted) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // 4. Renderizado 100% seguro en el cliente
   return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
-
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+    <Container maxWidth="md" sx={{ py: 5 }}>
+      <Typography variant="h3" sx={{ fontWeight: "bold" }} gutterBottom color="primary">
+        IT Command Center
+      </Typography>
+      
+      <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: 3 }}>
+        <Typography variant="h6" gutterBottom>Nueva Tarea</Typography>
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          
+          <Controller
+            name="title"
+            control={control}
+            render={({ field }) => (
+              <TextField 
+                {...field}
+                label="Título de la tarea" 
+                variant="outlined" 
+                fullWidth 
+                required 
+              />
+            )}
           />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+          
+          <Controller
+            name="description"
+            control={control}
+            render={({ field }) => (
+              <TextField 
+                {...field}
+                label="Descripción detallada" 
+                variant="outlined" 
+                multiline 
+                rows={3} 
+                fullWidth 
+              />
+            )}
           />
-          Go to turborepo.dev →
-        </a>
-      </footer>
-    </div>
+          
+          <Controller
+            name="priority"
+            control={control}
+            render={({ field }) => (
+              <TextField 
+                {...field}
+                select 
+                label="Prioridad" 
+                variant="outlined"
+                fullWidth
+              >
+                <MenuItem value={TaskPriority.LOW}>Baja</MenuItem>
+                <MenuItem value={TaskPriority.MEDIUM}>Media</MenuItem>
+                <MenuItem value={TaskPriority.HIGH}>Alta</MenuItem>
+                <MenuItem value={TaskPriority.CRITICAL}>Crítica</MenuItem>
+              </TextField>
+            )}
+          />
+
+          <Button type="submit" variant="contained" size="large" disableElevation>
+            Crear Tarea
+          </Button>
+        </Box>
+      </Paper>
+
+      <Paper elevation={1} sx={{ p: 2, borderRadius: 3 }}>
+        <Typography variant="h6" sx={{ px: 2, pt: 2 }}>Backlog Actual</Typography>
+        <Divider sx={{ my: 2 }} />
+        <List>
+          {tasks.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+              No hay tareas pendientes. El equipo está al día.
+            </Typography>
+          ) : (
+            tasks.map((task) => (
+              <ListItem key={task.id} divider>
+                <ListItemText 
+                  primary={task.title} 
+                  secondary={task.description || "Sin descripción"} 
+                />
+                <Chip 
+                  label={task.priority} 
+                  color={task.priority === 'CRITICAL' ? 'error' : 'primary'} 
+                  size="small" 
+                  variant="outlined"
+                />
+              </ListItem>
+            ))
+          )}
+        </List>
+      </Paper>
+    </Container>
   );
 }
