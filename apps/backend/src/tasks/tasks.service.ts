@@ -1,30 +1,30 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { CreateTaskDtoImpl, TaskStatus } from './dto/create-task.dto';
-
-type Task = CreateTaskDtoImpl & {
-  id: string;
-  status: TaskStatus;
-  creatorId: string;
-  createdAt: Date;
-};
+import { TaskEntity } from './entities/task.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class TasksService {
-  private readonly tasks: Task[] = [];
+  constructor(
+    @InjectRepository(TaskEntity)
+    private readonly taskRepository: Repository<TaskEntity>,
+  ) {}
 
-  create(createTaskDto: CreateTaskDtoImpl, creatorId: string) {
-    const newTask: Task = {
-      id: Math.random().toString(36).substring(2, 9),
+  async create(createTaskDto: CreateTaskDtoImpl, creatorId: string) {
+    const newTask = this.taskRepository.create({
       ...createTaskDto,
       status: TaskStatus.BACKLOG,
       creatorId,
-      createdAt: new Date(),
-    };
-    this.tasks.push(newTask);
-    return newTask;
+      dueDate: createTaskDto.dueDate ? new Date(createTaskDto.dueDate) : undefined,
+    });
+
+    return this.taskRepository.save(newTask);
   }
 
-  findAll() {
-    return this.tasks;
+  async findAll() {
+    return this.taskRepository.find({
+      order: { createdAt: 'DESC' },
+    });
   }
 }
