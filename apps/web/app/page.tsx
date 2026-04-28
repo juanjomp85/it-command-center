@@ -2,19 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form"; 
+import { CreateTaskDTO, ITask, TaskPriority } from "@it-corp/types";
 import { 
   Container, Typography, TextField, Button, Paper, 
   MenuItem, Box, Divider, List, ListItem, ListItemText, Chip, CircularProgress
 } from "@mui/material";
 
-enum TaskPriority { LOW = 'LOW', MEDIUM = 'MEDIUM', HIGH = 'HIGH', CRITICAL = 'CRITICAL' }
-interface TaskFormData { title: string; description: string; priority: TaskPriority; }
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  priority?: TaskPriority;
-}
+type TaskFormData = Required<Pick<CreateTaskDTO, "title" | "description" | "priority">>;
+type Task = Pick<ITask, "id" | "title" | "description" | "priority">;
 
 export default function CommandCenterDashboard() {
   // 1. EL ESCUDO CONTRA ERRORES DE HIDRATACIÓN (SSR)

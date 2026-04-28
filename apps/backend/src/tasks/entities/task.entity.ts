@@ -1,5 +1,5 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
-import { TaskPriority, TaskStatus } from '../dto/create-task.dto';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { TaskPriority, TaskStatus } from '@it-corp/types';
 
 @Entity({ name: 'tasks' })
 export class TaskEntity {
@@ -37,4 +37,7 @@ export class TaskEntity {
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt: Date;
 }

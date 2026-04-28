@@ -1,18 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { TaskPriority, TaskStatus } from '@it-corp/types';
 import { IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-
-export enum TaskPriority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  CRITICAL = 'CRITICAL',
-}
-
-export enum TaskStatus {
-  BACKLOG = 'BACKLOG',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-}
 
 export class CreateTaskDtoImpl {
   @ApiProperty()
@@ -39,3 +27,5 @@ export class CreateTaskDtoImpl {
   @IsOptional()
   assigneeId?: string;
 }
+
+export { TaskPriority, TaskStatus };
