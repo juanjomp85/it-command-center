@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller } from "react-hook-form"; 
 import { CreateTaskDTO, ITask, TaskPriority } from "@it-corp/types";
 import { 
@@ -10,11 +10,32 @@ import {
 
 type TaskFormData = Required<Pick<CreateTaskDTO, "title" | "description" | "priority">>;
 type Task = Pick<ITask, "id" | "title" | "description" | "priority">;
+const TASKS_QUERY_KEY = ["tasks"] as const;
+const API_BASE_URL = "http://localhost:4000";
+
+async function fetchTasks(): Promise<Task[]> {
+  const response = await fetch(`${API_BASE_URL}/tasks`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Error ${response.status}: ${errorText}`);
+  }
+  return response.json();
+}
+
+async function createTask(payload: TaskFormData) {
+  const response = await fetch(`${API_BASE_URL}/tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Error ${response.status}: ${errorText}`);
+  }
+  return response.json();
+}
 
 export default function CommandCenterDashboard() {
-  // 1. EL ESCUDO CONTRA ERRORES DE HIDRATACIÓN (SSR)
-  const [isMounted, setIsMounted] = useState(false);
-  
   const { control, handleSubmit, reset } = useForm<TaskFormData>({
     defaultValues: {
       title: "",
@@ -22,57 +43,33 @@ export default function CommandCenterDashboard() {
       priority: TaskPriority.MEDIUM
     }
   });
-  
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const queryClient = useQueryClient();
+  const {
+    data: tasks = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: TASKS_QUERY_KEY,
+    queryFn: fetchTasks,
+  });
 
-  const fetchTasks = async () => {
-    try {
-      const response = await fetch("http://localhost:4000/tasks");
-      
-      // 1. Verificamos si el servidor devolvió un error (ej. 404 o 500)
-      if (!response.ok) {
-        const errorText = await response.text(); // Leemos el HTML del error
-        console.error("El backend devolvió un error:", response.status, errorText);
-        return; // Salimos antes de que intente parsear el JSON
-      }
-
-      // 2. Si todo está bien, parseamos el JSON de forma segura
-      const data = await response.json();
-      setTasks(data);
-    } catch (error) {
-      console.error("Error de conexión (¿Está el backend encendido?):", error);
-    }
-  };
-
-  useEffect(() => {
-    setIsMounted(true);
-    fetchTasks();
-  }, []);
+  const createTaskMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: async () => {
+      reset();
+      await queryClient.invalidateQueries({ queryKey: TASKS_QUERY_KEY });
+    },
+    onError: (mutationError) => {
+      console.error("Fallo al crear la tarea:", mutationError);
+    },
+  });
 
   const onSubmit = async (data: TaskFormData) => {
-    try {
-      const response = await fetch("http://localhost:4000/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Fallo al crear la tarea:", response.status, errorText);
-        return;
-      }
-
-      reset();
-      fetchTasks();
-      
-    } catch (error) {
-      console.error("Error de red al crear tarea:", error);
-    }
+    await createTaskMutation.mutateAsync(data);
   };
 
-  // 3. Si el servidor está intentando renderizar, devolvemos un estado de carga
-  if (!isMounted) {
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
@@ -80,7 +77,6 @@ export default function CommandCenterDashboard() {
     );
   }
 
-  // 4. Renderizado 100% seguro en el cliente
   return (
     <Container maxWidth="md" sx={{ py: 5 }}>
       <Typography variant="h3" sx={{ fontWeight: "bold" }} gutterBottom color="primary">
@@ -140,7 +136,7 @@ export default function CommandCenterDashboard() {
           />
 
           <Button type="submit" variant="contained" size="large" disableElevation>
-            Crear Tarea
+            {createTaskMutation.isPending ? "Creando..." : "Crear Tarea"}
           </Button>
         </Box>
       </Paper>
@@ -148,6 +144,11 @@ export default function CommandCenterDashboard() {
       <Paper elevation={1} sx={{ p: 2, borderRadius: 3 }}>
         <Typography variant="h6" sx={{ px: 2, pt: 2 }}>Backlog Actual</Typography>
         <Divider sx={{ my: 2 }} />
+        {isError && (
+          <Typography variant="body2" color="error" sx={{ p: 2 }}>
+            Error al cargar tareas: {error instanceof Error ? error.message : "Error desconocido"}
+          </Typography>
+        )}
         <List>
           {tasks.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
